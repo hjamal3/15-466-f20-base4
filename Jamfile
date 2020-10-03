@@ -101,6 +101,8 @@ if $(OS) = NT { #Windows
 
 #Store the names of various .cpp files to build into variables:
 GAME_NAMES =
+	demo_menu
+	MenuMode
 	PlayMode
 	main
 	LitColorTextureProgram
