@@ -16,6 +16,14 @@
 
 #include <random>
 
+
+// harfbuzz, freetype
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include <hb.h>
+#include <hb-ft.h>
+
+
 Load< Sound::Sample > sound_click(LoadTagDefault, []() -> Sound::Sample* {
 	std::vector< float > data(size_t(48000 * 0.2f), 0.0f);
 	for (uint32_t i = 0; i < data.size(); ++i) {
@@ -117,6 +125,84 @@ void MenuMode::draw(glm::uvec2 const& drawable_size) {
 		glClear(GL_COLOR_BUFFER_BIT);
 	}
 
+	// Derived from:
+	// https://www.freetype.org/freetype2/docs/tutorial/step1.html
+	// https://harfbuzz.github.io/ch03s03.html
+	FT_Library library;
+	FT_Face face;
+	auto error = FT_Init_FreeType(&library);
+	if (error)
+	{
+		std::cout << "Libary not loaded." << std::endl;
+	}
+
+	// https://harfbuzz.github.io/ch03s03.html
+	// Create a buffer and put your text in it. 
+	hb_buffer_t* buf = hb_buffer_create();
+	hb_buffer_add_utf8(buf, "Apple", -1, 0, -1);
+
+	// Set the script, language and direction of the buffer. 
+	hb_buffer_set_direction(buf, HB_DIRECTION_LTR);
+	hb_buffer_set_script(buf, HB_SCRIPT_LATIN);
+	hb_buffer_set_language(buf, hb_language_from_string("en", -1));
+
+	// Create a face and a font, using FreeType for now. // just do once?
+	error = FT_New_Face(library, "C:/Windows/Fonts/arial.ttf", 0, &face); // considering loading font file to memory
+	if (error)
+	{
+		std::cout << "Failed to create face." << std::endl;
+	}
+
+	FT_Set_Char_Size(face, 0, 1000, 0, 0);
+	hb_font_t* font = hb_ft_font_create(face, NULL);
+
+	// Shape
+	hb_shape(font, buf, NULL, 0);
+
+	// Get the glyph and position information.
+	unsigned int glyph_count;
+	hb_glyph_info_t* glyph_info = hb_buffer_get_glyph_infos(buf, &glyph_count);
+	hb_glyph_position_t* glyph_pos = hb_buffer_get_glyph_positions(buf, &glyph_count);
+
+	// handle named slot that points to the face object's glyph slot
+	FT_GlyphSlot  slot = face->glyph;
+
+	// Iterate over each glyph. 
+	double cursor_x = 0;
+	double cursor_y = 0;
+	for (size_t i = 0; i < glyph_count; ++i) {
+		auto glyphid = glyph_info[i].codepoint; // the id specifies the specific letter
+		double  x_offset = glyph_pos[i].x_offset / 64.0;
+		double y_offset = glyph_pos[i].y_offset / 64.0;
+		double x_advance = glyph_pos[i].x_advance / 64.0;
+		double y_advance = glyph_pos[i].y_advance / 64.0;
+
+		// load glyph image
+		error = FT_Load_Glyph(face, glyphid, FT_LOAD_DEFAULT);
+		if (error)
+		{
+			std::cout << "Load glyph error" << std::endl;
+		}
+
+		// convert to bitmap
+		error = FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
+		if (error)
+		{
+			std::cout << "Rended error" << std::endl;
+		}
+
+		auto bm = face->glyph->bitmap;
+
+		// replace this
+		//draw_glyph(glyphid, cursor_x + x_offset, cursor_y + y_offset);
+		cursor_x += x_advance;
+		cursor_y += y_advance;
+	}
+
+	// Tidy up. 
+	hb_buffer_destroy(buf);
+	hb_font_destroy(font);
+
 	//use alpha blending:
 	//glEnable(GL_BLEND);
 	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -139,11 +225,6 @@ void MenuMode::draw(glm::uvec2 const& drawable_size) {
 				0.0f, 0.0f, 0.0f, 1.0f
 			));
 
-			// Level/freeplay text
-			//if (is_selected)
-			//{
-			//	std::cout << "item.name: " << item.name << std::endl;
-			//}
 			constexpr float H = 0.2f;
 			glm::u8vec4 color = (is_selected ? glm::u8vec4(0xff, 0x00, 0xff, 0x00) : glm::u8vec4(0x00, 0x00, 0x00, 0x00));
 			lines.draw_text(item.name,
@@ -153,32 +234,6 @@ void MenuMode::draw(glm::uvec2 const& drawable_size) {
 			);
 
 			y_offset -= 0.5f;
-			//float left, right;
-			//if (!item.sprite) {
-			//	//draw item.name as text:
-			//	draw_sprites.draw_text(
-			//		item.name, item.at, item.scale, color
-			//	);
-			//	glm::vec2 min, max;
-			//	draw_sprites.get_text_extents(
-			//		item.name, item.at, item.scale, &min, &max
-			//	);
-			//	left = min.x;
-			//	right = max.x;
-			//}
-			//else {
-			//	draw_sprites.draw(*item.sprite, item.at, item.scale, color);
-			//	left = item.at.x + item.scale * (item.sprite->min_px.x - item.sprite->anchor_px.x);
-			//	right = item.at.x + item.scale * (item.sprite->max_px.x - item.sprite->anchor_px.x);
-			//}
-			//if (is_selected) {
-			//	if (left_select) {
-			//		draw_sprites.draw(*left_select, glm::vec2(left - bounce, item.at.y) + left_select_offset, item.scale, left_select_tint);
-			//	}
-			//	if (right_select) {
-			//		draw_sprites.draw(*right_select, glm::vec2(right + bounce, item.at.y) + right_select_offset, item.scale, right_select_tint);
-			//	}
-			//}
 
 		}
 	} //<-- gets drawn here!
