@@ -22,6 +22,21 @@
 #include FT_FREETYPE_H
 #include <hb.h>
 #include <hb-ft.h>
+#include "ColorTextureProgram.hpp"
+#include <glm/gtc/type_ptr.hpp>
+
+unsigned int VAO, VBO;
+static Load< void > setup_buffers(LoadTagDefault, []() {
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
+	glBindVertexArray(VAO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
+	glEnableVertexAttribArray(0);
+	glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
+	glBindBuffer(GL_ARRAY_BUFFER, 0);
+	glBindVertexArray(0);
+	});
 
 
 Load< Sound::Sample > sound_click(LoadTagDefault, []() -> Sound::Sample* {
@@ -47,6 +62,20 @@ Load< Sound::Sample > sound_clonk(LoadTagDefault, []() -> Sound::Sample* {
 	}
 	return new Sound::Sample(data);
 	});
+
+/// Holds all state information relevant to a character as loaded using FreeType
+struct Character {
+	const int texture_id; // ID handle of the glyph texture
+	const int width;
+	const int height;
+	const double offset_x;
+	const double offset_y;
+	const double advance_x;
+	const double advance_y;
+	Character(int texture_id, int width, int height, double offset_x, double offset_y, double advance_x, double advance_y) :
+		texture_id(texture_id), width(width), height(height), offset_x(offset_x), offset_y(offset_y), advance_x(advance_x), advance_y(advance_y)
+	{}
+};
 
 
 MenuMode::MenuMode(std::vector< Item > const& items_) : items(items_) {
@@ -139,7 +168,7 @@ void MenuMode::draw(glm::uvec2 const& drawable_size) {
 	// https://harfbuzz.github.io/ch03s03.html
 	// Create a buffer and put your text in it. 
 	hb_buffer_t* buf = hb_buffer_create();
-	hb_buffer_add_utf8(buf, "Apple", -1, 0, -1);
+	hb_buffer_add_utf8(buf, "AB", -1, 0, -1);
 
 	// Set the script, language and direction of the buffer. 
 	hb_buffer_set_direction(buf, HB_DIRECTION_LTR);
@@ -167,95 +196,201 @@ void MenuMode::draw(glm::uvec2 const& drawable_size) {
 	// handle named slot that points to the face object's glyph slot
 	FT_GlyphSlot  slot = face->glyph;
 
-	// Iterate over each glyph. 
+	static bool loaded = false;
+	static std::vector<Character> characters;
+
+	if (!loaded)
+	{
+		glEnable(GL_CULL_FACE);
+		glEnable(GL_BLEND);
+		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+		glDisable(GL_DEPTH_TEST);
+
+		// load textures
+		for (size_t i = 0; i < glyph_count; ++i) {
+
+			// glyph constants
+			auto glyphid = glyph_info[i].codepoint; // the id specifies the specific letter
+			double x_offset = glyph_pos[i].x_offset / 64.0;
+			double y_offset = glyph_pos[i].y_offset / 64.0;
+			double x_advance = glyph_pos[i].x_advance / 64.0;
+			double y_advance = glyph_pos[i].y_advance / 64.0;
+
+			// load glyph image
+			error = FT_Load_Glyph(face, glyphid, FT_LOAD_DEFAULT);
+			if (error)
+			{
+				std::cout << "Load glyph error" << std::endl;
+			}
+
+			// convert to bitmap
+			error = FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
+			if (error)
+			{
+				std::cout << "Render error" << std::endl;
+			}
+			int w = face->glyph->bitmap.width;
+			int h = face->glyph->bitmap.rows;
+
+			// heavily following: https://learnopengl.com/In-Practice/Text-Rendering
+			glUseProgram(color_texture_program->program);
+
+			// 1 color
+			glPixelStorei(GL_UNPACK_ALIGNMENT, 1);
+
+			// store into texture
+			unsigned int texture;
+			glGenTextures(1, &texture);
+
+			glBindTexture(GL_TEXTURE_2D, texture);
+			glTexImage2D(
+				GL_TEXTURE_2D,
+				0,
+				GL_RED,
+				face->glyph->bitmap.width,
+				face->glyph->bitmap.rows,
+				0,
+				GL_RED,
+				GL_UNSIGNED_BYTE,
+				face->glyph->bitmap.buffer
+			);
+			// set texture options
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+			glBindTexture(GL_TEXTURE_2D, 0);
+
+			// create character and push back
+			characters.push_back({ (int)texture,w,h, x_offset, y_offset,x_advance,y_advance });
+
+		}
+		// configure VAO/VBO for texture quads
+		glGenVertexArrays(1, &VAO);
+		glGenBuffers(1, &VBO);
+		glBindVertexArray(VAO);
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 4, NULL, GL_DYNAMIC_DRAW);
+		glEnableVertexAttribArray(0);
+		glVertexAttribPointer(0, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), 0);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+		glBindVertexArray(0);
+		loaded = true;
+	}
+
+	// DRAW
+	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+	glClear(GL_COLOR_BUFFER_BIT);
+
+	// Draw
+	// start position
 	double cursor_x = 0;
 	double cursor_y = 0;
 	for (size_t i = 0; i < glyph_count; ++i) {
-		auto glyphid = glyph_info[i].codepoint; // the id specifies the specific letter
-		double  x_offset = glyph_pos[i].x_offset / 64.0;
-		double y_offset = glyph_pos[i].y_offset / 64.0;
-		double x_advance = glyph_pos[i].x_advance / 64.0;
-		double y_advance = glyph_pos[i].y_advance / 64.0;
 
-		// load glyph image
-		error = FT_Load_Glyph(face, glyphid, FT_LOAD_DEFAULT);
-		if (error)
-		{
-			std::cout << "Load glyph error" << std::endl;
-		}
+		Character c = characters[i];
+		// heavily following: https://learnopengl.com/In-Practice/Text-Rendering
+		glm::mat4 to_clip = glm::mat4( //n.b. column major(!)
+			1 * 2.0f / float(drawable_size.x), 0.0f, 0.0f, 0.0f,
+			0.0f, 1 * 2.0f / float(drawable_size.y), 0.0f, 0.0f,
+			0.0f, 0.0f, 1.0f, 0.0f,
+			2.0f / float(drawable_size.x), 2.0f / float(drawable_size.y), 0.0f, 1.0f
+		);
+		glUseProgram(color_texture_program->program);
+		glUniform3f(glGetUniformLocation(color_texture_program->program, "textColor"), 1.0f, 0.0f, 1.0f);
+		glUniformMatrix4fv(color_texture_program->OBJECT_TO_CLIP_mat4, 1, GL_FALSE, glm::value_ptr(to_clip));
+		glBindVertexArray(VAO);
 
-		// convert to bitmap
-		error = FT_Render_Glyph(face->glyph, FT_RENDER_MODE_NORMAL);
-		if (error)
-		{
-			std::cout << "Rended error" << std::endl;
-		}
+		float xpos = (float)cursor_x + (float)c.offset_x;
+		float ypos = (float)cursor_y + (float)c.offset_y;
+		int w = c.width;
+		int h = c.height;
 
-		auto bm = face->glyph->bitmap;
+		// update VBO for each character
+		// two triangles!!!
+		float vertices[6][4] = {
+			{ xpos,     ypos + h,   0.0f, 0.0f },
+			{ xpos,     ypos,       0.0f, 1.0f },
+			{ xpos + w, ypos,       1.0f, 1.0f },
+			{ xpos,     ypos + h,   0.0f, 0.0f },
+			{ xpos + w, ypos,       1.0f, 1.0f },
+			{ xpos + w, ypos + h,   1.0f, 0.0f }
+		};
 
-		// replace this
-		//draw_glyph(glyphid, cursor_x + x_offset, cursor_y + y_offset);
-		cursor_x += x_advance;
-		cursor_y += y_advance;
+		// render glyph texture over quad
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, c.texture_id);
+
+		// update content of VBO memory
+		glBindBuffer(GL_ARRAY_BUFFER, VBO);
+		glBufferSubData(GL_ARRAY_BUFFER, 0, sizeof(vertices), vertices);
+		glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+		// render quad (run opengl pipeline)
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+		// update start
+		cursor_x += c.advance_x;
+		cursor_y += c.advance_y;
 	}
 
-	// Tidy up. 
+	// clean up face
+	FT_Done_Face(face);
+
+	// close out
+	glBindVertexArray(0);
+	glBindTexture(GL_TEXTURE_2D, 0);
+	glUseProgram(0);
+
+	//// Tidy up. 
 	hb_buffer_destroy(buf);
 	hb_font_destroy(font);
 
-	//use alpha blending:
-	//glEnable(GL_BLEND);
-	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-	//don't use the depth test:
-	glDisable(GL_DEPTH_TEST);
+	////use alpha blending:
+	////glEnable(GL_BLEND);
+	////glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+	////don't use the depth test:
+	//glDisable(GL_DEPTH_TEST);
 
 	//float bounce = (0.25f - (select_bounce_acc - 0.5f) * (select_bounce_acc - 0.5f)) / 0.25f * select_bounce_amount;
 
-	{ //draw the menu using DrawSprites:
-		/*assert(atlas && "it is an error to try to draw a menu without an atlas");
-		DrawSprites draw_sprites(*atlas, view_min, view_max, drawable_size, DrawSprites::AlignPixelPerfect);*/
-		float y_offset = 0.0f;
-		for (auto const& item : items) {
-			bool is_selected = (&item == &items[0] + selected);
-			float aspect = float(drawable_size.x) / float(drawable_size.y);
-			DrawLines lines(glm::mat4(
-				1.0f / aspect, 0.0f, 0.0f, 0.0f,
-				0.0f, 1.0f, 0.0f, 0.0f,
-				0.0f, 0.0f, 1.0f, 0.0f,
-				0.0f, 0.0f, 0.0f, 1.0f
-			));
+	//{ //draw the menu using DrawSprites:
+	//	/*assert(atlas && "it is an error to try to draw a menu without an atlas");
+	//	DrawSprites draw_sprites(*atlas, view_min, view_max, drawable_size, DrawSprites::AlignPixelPerfect);*/
+	//	float y_offset = 0.0f;
+	//	for (auto const& item : items) {
+	//		bool is_selected = (&item == &items[0] + selected);
+	//		float aspect = float(drawable_size.x) / float(drawable_size.y);
+	//		DrawLines lines(glm::mat4(
+	//			1.0f / aspect, 0.0f, 0.0f, 0.0f,
+	//			0.0f, 1.0f, 0.0f, 0.0f,
+	//			0.0f, 0.0f, 1.0f, 0.0f,
+	//			0.0f, 0.0f, 0.0f, 1.0f
+	//		));
 
-			constexpr float H = 0.2f;
-			glm::u8vec4 color = (is_selected ? glm::u8vec4(0xff, 0x00, 0xff, 0x00) : glm::u8vec4(0x00, 0x00, 0x00, 0x00));
-			lines.draw_text(item.name,
-				glm::vec3(-aspect + 0.1f * H, 1.0f - 1.1f * H + y_offset, 0.0),
-				glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
-				color
-			);
+	//		constexpr float H = 0.2f;
+	//		glm::u8vec4 color = (is_selected ? glm::u8vec4(0xff, 0x00, 0xff, 0x00) : glm::u8vec4(0x00, 0x00, 0x00, 0x00));
+	//		lines.draw_text(item.name,
+	//			glm::vec3(-aspect + 0.1f * H, 1.0f - 1.1f * H + y_offset, 0.0),
+	//			glm::vec3(H, 0.0f, 0.0f), glm::vec3(0.0f, H, 0.0f),
+	//			color
+	//		);
 
-			y_offset -= 0.5f;
+	//		y_offset -= 0.5f;
 
-		}
-	} //<-- gets drawn here!
-
+	//	}
+	//} //<-- gets drawn here!
 
 	GL_ERRORS(); //PARANOIA: print errors just in case we did something wrong.
 }
 
 
 void MenuMode::layout_items(float gap) {
-	//DrawSprites temp(*atlas, view_min, view_max, view_max - view_min, DrawSprites::AlignPixelPerfect); //<-- doesn't actually draw
+
 	float y = view_max.y;
 	for (auto& item : items) {
 		glm::vec2 min(0, 0);
 		glm::vec2 max(0, 0);
-		/*if (item.sprite) {
-			min = item.scale * (item.sprite->min_px - item.sprite->anchor_px);
-			max = item.scale * (item.sprite->max_px - item.sprite->anchor_px);
-		}
-		else {
-			temp.get_text_extents(item.name, glm::vec2(0.0f), item.scale, &min, &max);
-		}*/
 		item.at.y = y - max.y;
 		item.at.x = 0.5f * (view_max.x + view_min.x) - 0.5f * (max.x + min.x);
 		y = y - (max.y - min.y) - gap;
