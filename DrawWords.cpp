@@ -119,6 +119,10 @@ void DrawWords::draw_text(std::string const& text, const int y, glm::u8vec4 cons
 			}
 			int w = face->glyph->bitmap.width;
 			int h = face->glyph->bitmap.rows;
+			x_offset = face->glyph->bitmap_left;
+			y_offset = face->glyph->bitmap_top;
+			x_advance = face->glyph->advance.x;
+			y_advance = face->glyph->advance.y;
 
 			// heavily following: https://learnopengl.com/In-Practice/Text-Rendering
 			glUseProgram(color_texture_program->program);
@@ -165,7 +169,7 @@ void DrawWords::draw_text(std::string const& text, const int y, glm::u8vec4 cons
 	//glClear(GL_COLOR_BUFFER_BIT);
 	// Draw
 	// start position
-	double cursor_x = 0;
+	double cursor_x = -50;
 	double cursor_y = y;
 	for (size_t i = 0; i < characters.size(); ++i) {
 		Character c = characters[i];
@@ -175,7 +179,7 @@ void DrawWords::draw_text(std::string const& text, const int y, glm::u8vec4 cons
 		glUniformMatrix4fv(color_texture_program->OBJECT_TO_CLIP_mat4, 1, GL_FALSE, glm::value_ptr(world_to_clip));
 		glBindVertexArray(VAO);
 		float xpos = (float)cursor_x + (float)c.offset_x;
-		float ypos = (float)cursor_y + (float)c.offset_y;
+		float ypos = (float)cursor_y - (c.height - (float)c.offset_y);
 		int w = c.width;
 		int h = c.height;
 		// update VBO for each character
@@ -198,8 +202,8 @@ void DrawWords::draw_text(std::string const& text, const int y, glm::u8vec4 cons
 		// render quad (run opengl pipeline)
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		// update start
-		cursor_x += c.advance_x;
-		cursor_y += c.advance_y;
+		cursor_x += c.advance_x/64.0;
+		cursor_y += c.advance_y/64.0;
 	}
 	// close out
 	glBindVertexArray(0);
