@@ -168,7 +168,8 @@ void MenuMode::draw(glm::uvec2 const& drawable_size) {
 	// https://harfbuzz.github.io/ch03s03.html
 	// Create a buffer and put your text in it. 
 	hb_buffer_t* buf = hb_buffer_create();
-	hb_buffer_add_utf8(buf, "AB", -1, 0, -1);
+	std::string s = "AB";
+	hb_buffer_add_utf8(buf, s.c_str(), -1, 0, -1);
 
 	// Set the script, language and direction of the buffer. 
 	hb_buffer_set_direction(buf, HB_DIRECTION_LTR);
