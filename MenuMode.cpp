@@ -134,18 +134,22 @@ void MenuMode::draw(glm::uvec2 const& drawable_size) {
 	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 	///////////////////////////////////////////////////////
-	std::string s1 = "hi";
-	std::string s2 = "lol";
-	glm::mat4 to_clip = glm::mat4( //n.b. column major(!)
+	static glm::mat4 to_clip = glm::mat4( //n.b. column major(!)
 		1 * 2.0f / float(drawable_size.x), 0.0f, 0.0f, 0.0f,
 		0.0f, 1 * 2.0f / float(drawable_size.y), 0.0f, 0.0f,
 		0.0f, 0.0f, 1.0f, 0.0f,
 		2.0f / float(drawable_size.x), 2.0f / float(drawable_size.y), 0.0f, 1.0f
 	);	
 	static DrawWords draw_words(to_clip);
-	draw_words.draw_text(s1,0, glm::u8vec4(0xff, 0x00, 0x00, 0x00));
-	draw_words.draw_text(s2,-50, glm::u8vec4(0x00, 0xff, 0x00, 0x00));
 
+	int y_offset = 0;
+	for (auto const& item : items) {
+		bool is_selected = (&item == &items[0] + selected);
+		/*float aspect = float(drawable_size.x) / float(drawable_size.y);*/
+		glm::u8vec4 color = (is_selected ? glm::u8vec4(0xff, 0x00, 0xff, 0x00) : glm::u8vec4(0x00, 0x00, 0x00, 0x00));
+		draw_words.draw_text(item.name, y_offset, color);
+		y_offset -= 50;
+	}
 	///////////////////////////////////////////////////////
 	// older code that draws menus with draw lines 
 	//use alpha blending:
