@@ -242,7 +242,6 @@ void MenuMode::draw(glm::uvec2 const& drawable_size) {
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 	///////////////////////////////////////////////////////
-	static float scale = (float)std::min(drawable_size.x, drawable_size.y);
 	static glm::mat4 to_clip = glm::mat4( //n.b. column major(!)
 		2.0 /drawable_size.x, 0.0f, 0.0f, 0.0f,
 		0.0f, 2.0 /drawable_size.y , 0.0f, 0.0f,
