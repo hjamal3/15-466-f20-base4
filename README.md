@@ -4,7 +4,7 @@ Author: Haidar Jamal
 
 Design: There is a preloaded set of words that comprises of Google's top 20000 word searches and you have to try to come up with one of these words from a set of randomly generated letters and the longer the word (riskier), the larger the reward. You are also penalized for wrong guesses or asking to reset.
 
-Text Drawing: In this game, every word that needs to be shown on the screen is sent to an instance of DrawWords (similar to DrawLines), which is stored in static memory of the PlayMode (called MenuMode in this game). The word is generated in runtime in this game. DrawWords contains a map that links strings to a vector of a special Character struct. If the map doesn't contain the string, Harfbuzz and Freetype are first used to create a bitmap of each letter in the word. This bitmap is used to generate a texture in OpenGL. The texture and other dimensional information from each letter is stored in a Character, which is pushed back into a vector of Characters, which is inserted to the map. Thus, words are stored only once as needed and are rendered at runtime. I believe this can scale to a reasonable size. The key files are DrawWords.cpp/hpp, MenuMode.cpp/hpp, game_menu.cpp/hpp.
+Text Drawing: In this game, every word that needs to be shown on the screen is sent to an instance of DrawWords (similar to DrawLines), which is stored in static memory of the PlayMode (called MenuMode in this game). The word is generated in runtime in this game. DrawWords contains a map that links strings to a vector of a special Character struct. If the map doesn't contain the string, Harfbuzz and Freetype are first used to create a bitmap of each letter in the word. This bitmap is used to generate a texture in OpenGL. The texture and other dimensional information from each letter is stored in a Character, which is pushed back into a vector of Characters, which is inserted to the map. Thus, words are stored only once as needed and are rendered at runtime. I believe this can scale to a reasonable size. The key files are DrawWords.cpp/hpp, MenuMode.cpp/hpp, and game_menu.cpp/hpp.
 
 Screen Shot:
 
@@ -17,8 +17,8 @@ To select a letter hit enter. The word you are generating will appear in the top
 Sources:   
 I did not use any assets in this game, but I heavily referenced a few of the following resources:  
 harfbuzz: https://harfbuzz.github.io/ch03s03.html  
-freetype: https://www.freetype.org/freetype2/docs/tutorial/step1.html
-opengl: https://learnopengl.com/In-Practice/Text-Rendering
+freetype: https://www.freetype.org/freetype2/docs/tutorial/step1.html  
+opengl: https://learnopengl.com/In-Practice/Text-Rendering  
 base code: https://github.com/15-466/15-466-f19-base6  
 And lastly thank you to the 15-466-f20 students/professor for their helpful tips.  
 
