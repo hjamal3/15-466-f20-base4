@@ -184,7 +184,7 @@ bool MenuMode::handle_event(SDL_Event const& evt, glm::uvec2 const& window_size)
 					if (common_words->find(current_str) != common_words->end())
 					{
 						points +=(int) current_str.size() * (int) current_str.size();
-						if (points == max_points)
+						if (points >= max_points)
 						{
 							game_over = true;
 						}
@@ -274,7 +274,13 @@ void MenuMode::draw(glm::uvec2 const& drawable_size) {
 		// drawing string
 		else if (item.type == 2)
 		{
-			draw_words.draw_text(current_str, -600, 300, glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+			if (game_over)
+			{
+				draw_words.draw_text("You got 25 points! Game over. Good job.", -600, 300, glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+			}
+			else {
+				draw_words.draw_text(current_str, -600, 300, glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+			}
 		}
 
 	}
