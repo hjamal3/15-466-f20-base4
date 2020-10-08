@@ -88,9 +88,6 @@ void DrawWords::draw_text(std::string const& text, const int x, const int y, glm
 		hb_glyph_info_t* glyph_info = hb_buffer_get_glyph_infos(buf, &glyph_count);
 		hb_glyph_position_t* glyph_pos = hb_buffer_get_glyph_positions(buf, &glyph_count);
 
-		// handle named slot that points to the face object's glyph slot
-		FT_GlyphSlot  slot = face->glyph;
-
 		glEnable(GL_CULL_FACE);
 		glEnable(GL_BLEND);
 		glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
