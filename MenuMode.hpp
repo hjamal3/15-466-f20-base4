@@ -1,5 +1,6 @@
 #pragma once
-// based on https://github.com/15-466/15-466-f19-base6
+
+// Heavily based on https://github.com/15-466/15-466-f19-base6
 
 #include "Mode.hpp"
 
@@ -10,6 +11,9 @@
 // random number generation: http://www.cplusplus.com/reference/cstdlib/rand/
 #include <stdlib.h>     /* srand, rand */
 #include <time.h>       /* time */
+
+// types of buttons
+enum Button { Letter, Points, String, Enter, Reset };
 
 struct MenuMode : Mode {
 	struct Item;
@@ -41,9 +45,20 @@ struct MenuMode : Mode {
 		glm::u8vec4 selected_tint; //tint for sprite (selected)
 		std::function< void(Item const&) > on_select; //if set, item is selectable
 		glm::vec2 at; //location to draw item
-		int type = 0;
+		Button type = Letter;
 	};
+
 	std::vector< Item > items;
+	int num_selectable = 0;
+	std::vector<char> letters;
+	std::vector<char> all_letters = { 'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z' };
+	std::vector<char> vowels = { 'a','e','i','o','u' };
+	std::string current_str = "";
+	void randomize_letters(std::vector<Item>& items);
+	// game points counter
+	int points = 0;
+	const int max_points = 25;
+	bool game_over = false;
 
 	//call to arrange items in a centered list:
 	void layout_items(float gap = 0.0f);
@@ -57,12 +72,6 @@ struct MenuMode : Mode {
 
 	glm::u8vec4 left_select_tint = glm::u8vec4(0xff);
 	glm::u8vec4 right_select_tint = glm::u8vec4(0xff);
-
-	//float select_bounce_amount = 0.0f;
-	//float select_bounce_acc = 0.0f;
-
-	//must be set to the atlas from which all the sprites used herein are taken:
-	//SpriteAtlas const* atlas = nullptr;
 
 	//currently selected item:
 	uint32_t selected = 0;
@@ -78,14 +87,5 @@ struct MenuMode : Mode {
 	//IMPORTANT NOTE: this means that if background->draw() ends up deleting this (e.g., by removing
 	//  the last shared_ptr that references it), then it will crash. Don't do that!
 	std::shared_ptr< Mode > background;
-	int num_selectable = 0;
-	std::vector<char> letters;
-	std::vector<char> all_letters = { 'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z' };
-	std::vector<char> vowels = { 'a','e','i','o','u' };
-	std::string current_str = "";
 
-	void randomize_letters(std::vector<Item> & items);
-
-	// game points counter
-	int points = 0;
 };

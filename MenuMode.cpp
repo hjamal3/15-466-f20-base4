@@ -13,9 +13,13 @@
 
 //for loading:
 #include "Load.hpp"
-
 #include <random>
 #include <string>
+#include <set>
+#include <algorithm>
+#include <fstream>
+#include <iostream>
+#include <iterator>
 
 
 // harfbuzz, freetype
@@ -27,6 +31,25 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "DrawWords.hpp"
+#include "data_path.hpp"
+
+
+
+//Load< SpriteAtlas > trade_font_atlas(LoadTagDefault, []() -> SpriteAtlas const* {
+//	return new SpriteAtlas(data_path("trade-font"));
+//	});
+
+// load txt file
+Load<std::set<std::string>> common_words(LoadTagDefault, []()->std::set<std::string>* {
+	// taken from: https://github.com/first20hours/google-10000-english
+	std::set<std::string> *s  = new std::set<std::string>();
+	std::ifstream file(data_path("20k.txt"));
+	std::copy(std::istream_iterator<std::string>(file),
+		std::istream_iterator<std::string>(),
+		std::inserter(*s, (*s).end()));
+	return s;
+});
+
 
 Load< Sound::Sample > sound_click(LoadTagDefault, []() -> Sound::Sample* {
 	std::vector< float > data(size_t(48000 * 0.2f), 0.0f);
@@ -71,7 +94,7 @@ MenuMode::MenuMode(std::vector< Item > const& items_) : items(items_) {
 	}
 
 	// last option is enter
-	//num_selectable -= 1;
+	num_selectable -= 2;
 
 	// randomize the letters once something is pressed
 	randomize_letters(items);
@@ -89,11 +112,23 @@ void MenuMode::randomize_letters(std::vector<Item>& items)
 
 	/* initialize random seed: */
 	// first letter is a vowel
-	letters.push_back(vowels[rand() % 5]);
+	std::set<int> added_letters; // don't want the same letter multiple times
+	added_letters.clear();
+	int tmp = 0;
+	tmp = rand() % 5;
+	letters.push_back(vowels[tmp]);
+	added_letters.insert(tmp);
+
 	// initialize letters
 	for (int i = 1; i < num_selectable; i++)
 	{
-		letters.push_back(all_letters[rand() % 26]);
+		tmp = rand() % 26;
+		while (added_letters.find(tmp) != added_letters.end())
+		{
+			tmp = rand() % 26;
+		}
+		added_letters.insert(tmp);
+		letters.push_back(all_letters[tmp]);
 	}
 	// visualize
 	int counter = 0;
@@ -101,8 +136,8 @@ void MenuMode::randomize_letters(std::vector<Item>& items)
 		if (items[i].on_select) {
 			items[i].name = std::to_string(counter + 1) + ": " + std::string(1, letters[counter]);
 			counter += 1;
-			// don't change enter
-			if (counter == num_selectable - 1)
+			// don't change enter or reset
+			if (counter == num_selectable)
 			{
 				break;
 			}
@@ -142,7 +177,36 @@ bool MenuMode::handle_event(SDL_Event const& evt, glm::uvec2 const& window_size)
 			if (selected < items.size() && items[selected].on_select) {
 				Sound::play(*sound_clonk);
 				items[selected].on_select(items[selected]);
-				current_str += items[selected].name[3];
+				// pressed enter
+				if (items[selected].type == 3)
+				{
+					// processing code here
+					if (common_words->find(current_str) != common_words->end())
+					{
+						points +=(int) current_str.size() * (int) current_str.size();
+						if (points == max_points)
+						{
+							game_over = true;
+						}
+					}
+					else
+					{
+						points -= std::max(0, points - 1);
+					}
+					current_str.clear();
+				}
+				// pressed reset
+				else if (items[selected].type == 4)
+				{
+					int len = (int)current_str.size();
+					len = std::max(1, len);
+					points = std::max(0, points - 1);
+					current_str.clear();
+				}
+				else
+				{
+					current_str += items[selected].name[3];
+				}
 				randomize_letters(items);
 				return true;
 			}
@@ -157,10 +221,6 @@ bool MenuMode::handle_event(SDL_Event const& evt, glm::uvec2 const& window_size)
 }
 
 void MenuMode::update(float elapsed) {
-
-	//select_bounce_acc = select_bounce_acc + elapsed / 0.7f;
-	//select_bounce_acc -= std::floor(select_bounce_acc);
-
 	if (background) {
 		background->update(elapsed);
 	}
@@ -178,7 +238,6 @@ void MenuMode::draw(glm::uvec2 const& drawable_size) {
 		glClear(GL_COLOR_BUFFER_BIT);
 	}
 
-
 	//// DRAW
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
@@ -190,13 +249,15 @@ void MenuMode::draw(glm::uvec2 const& drawable_size) {
 		0.0f, 0.0f, 1.0f, 0.0f,
 		2.0f / float(drawable_size.x), 2.0f / float(drawable_size.y), 0.0f, 1.0f
 	);	
+
+	// key!!!
 	static DrawWords draw_words(to_clip);
 
-	int y_offset = 100;
+	int y_offset = 150;
 	for (auto const& item : items) {
 
 		// regular items
-		if (!item.type)
+		if (item.type == 0 || item.type == 3 || item.type == 4)
 		{
 			bool is_selected = (&item == &items[0] + selected);
 			/*float aspect = float(drawable_size.x) / float(drawable_size.y);*/
@@ -210,10 +271,15 @@ void MenuMode::draw(glm::uvec2 const& drawable_size) {
 			std::string s = item.name + ": " + std::to_string(points);
 			draw_words.draw_text(s, -600, -300, glm::u8vec4(0xff, 0xff, 0xff, 0x00));
 		}
+		// drawing string
+		else if (item.type == 2)
+		{
+			draw_words.draw_text(current_str, -600, 300, glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+		}
 
 	}
 	///////////////////////////////////////////////////////
-	// older code that draws menus with draw lines 
+	// older code that draws menus with draw lines... kept for maybe future use
 	//use alpha blending:
 	//glEnable(GL_BLEND);
 	//glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -242,13 +308,12 @@ void MenuMode::draw(glm::uvec2 const& drawable_size) {
 	//		y_offset -= 0.5f;
 	//	}
 	//} //<-- gets drawn here!
+	///////////////////////////////////////////////////////
 
 	GL_ERRORS(); //PARANOIA: print errors just in case we did something wrong.
 }
 
-
 void MenuMode::layout_items(float gap) {
-
 	float y = view_max.y;
 	for (auto& item : items) {
 		glm::vec2 min(0, 0);
