@@ -7,6 +7,10 @@
 #include <functional>
 #include <string>
 
+// random number generation: http://www.cplusplus.com/reference/cstdlib/rand/
+#include <stdlib.h>     /* srand, rand */
+#include <time.h>       /* time */
+
 struct MenuMode : Mode {
 	struct Item;
 	MenuMode(std::vector< Item > const& items);
@@ -37,6 +41,7 @@ struct MenuMode : Mode {
 		glm::u8vec4 selected_tint; //tint for sprite (selected)
 		std::function< void(Item const&) > on_select; //if set, item is selectable
 		glm::vec2 at; //location to draw item
+		int type = 0;
 	};
 	std::vector< Item > items;
 
@@ -73,5 +78,14 @@ struct MenuMode : Mode {
 	//IMPORTANT NOTE: this means that if background->draw() ends up deleting this (e.g., by removing
 	//  the last shared_ptr that references it), then it will crash. Don't do that!
 	std::shared_ptr< Mode > background;
+	int num_selectable = 0;
+	std::vector<char> letters;
+	std::vector<char> all_letters = { 'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z' };
+	std::vector<char> vowels = { 'a','e','i','o','u' };
+	std::string current_str = "";
 
+	void randomize_letters(std::vector<Item> & items);
+
+	// game points counter
+	int points = 0;
 };

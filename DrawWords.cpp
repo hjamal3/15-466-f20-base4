@@ -37,7 +37,7 @@ DrawWords::DrawWords(glm::mat4 const& world_to_clip_) : world_to_clip(world_to_c
 
 // to do: have the textures stored in some permanent array than having them
 // generated on each time draw_text is called
-void DrawWords::draw_text(std::string const& text, const int y, glm::u8vec4 const& color)
+void DrawWords::draw_text(std::string const& text, const int x, const int y, glm::u8vec4 const& color)
 {
 	std::vector<Character> characters;
 	auto it = words.find(text);
@@ -169,7 +169,7 @@ void DrawWords::draw_text(std::string const& text, const int y, glm::u8vec4 cons
 	//glClear(GL_COLOR_BUFFER_BIT);
 	// Draw
 	// start position
-	double cursor_x = -50;
+	double cursor_x = x;
 	double cursor_y = y;
 	for (size_t i = 0; i < characters.size(); ++i) {
 		Character c = characters[i];

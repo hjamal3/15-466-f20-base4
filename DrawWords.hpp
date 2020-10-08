@@ -31,7 +31,7 @@ struct DrawWords {
 
 	//draw wireframe text, start at anchor, move in x direction, mat gives x and y directions for text drawing:
 	// (default character box is 1 unit high)
-	void draw_text(std::string const& text, const int y, glm::u8vec4 const& color = glm::u8vec4(0xff));
+	void draw_text(std::string const& text, const int x, const int y, glm::u8vec4 const& color = glm::u8vec4(0xff));
 
 	//Finish drawing (push attribs to GPU):
 	~DrawWords();

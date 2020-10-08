@@ -15,6 +15,7 @@
 #include "Load.hpp"
 
 #include <random>
+#include <string>
 
 
 // harfbuzz, freetype
@@ -55,6 +56,7 @@ Load< Sound::Sample > sound_clonk(LoadTagDefault, []() -> Sound::Sample* {
 
 MenuMode::MenuMode(std::vector< Item > const& items_) : items(items_) {
 
+
 	//select first item which can be selected:
 	for (uint32_t i = 0; i < items.size(); ++i) {
 		if (items[i].on_select) {
@@ -62,7 +64,52 @@ MenuMode::MenuMode(std::vector< Item > const& items_) : items(items_) {
 			break;
 		}
 	}
+	for (uint32_t i = 0; i < items.size(); ++i) {
+		if (items[i].on_select) {
+			num_selectable++;
+		}
+	}
+
+	// last option is enter
+	//num_selectable -= 1;
+
+	// randomize the letters once something is pressed
+	randomize_letters(items);
+
+	// initialize random seed
+	srand((unsigned)time(0));
+
 }
+
+void MenuMode::randomize_letters(std::vector<Item>& items)
+{
+	// empty letters
+	letters.clear();
+	letters.reserve(num_selectable);
+
+	/* initialize random seed: */
+	// first letter is a vowel
+	letters.push_back(vowels[rand() % 5]);
+	// initialize letters
+	for (int i = 1; i < num_selectable; i++)
+	{
+		letters.push_back(all_letters[rand() % 26]);
+	}
+	// visualize
+	int counter = 0;
+	for (uint32_t i = 0; i < items.size(); i++) {
+		if (items[i].on_select) {
+			items[i].name = std::to_string(counter + 1) + ": " + std::string(1, letters[counter]);
+			counter += 1;
+			// don't change enter
+			if (counter == num_selectable - 1)
+			{
+				break;
+			}
+		}
+	}
+}
+
 
 MenuMode::~MenuMode() {
 }
@@ -95,6 +142,8 @@ bool MenuMode::handle_event(SDL_Event const& evt, glm::uvec2 const& window_size)
 			if (selected < items.size() && items[selected].on_select) {
 				Sound::play(*sound_clonk);
 				items[selected].on_select(items[selected]);
+				current_str += items[selected].name[3];
+				randomize_letters(items);
 				return true;
 			}
 		}
@@ -131,24 +180,37 @@ void MenuMode::draw(glm::uvec2 const& drawable_size) {
 
 
 	//// DRAW
-	glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 	///////////////////////////////////////////////////////
+	static float scale = (float)std::min(drawable_size.x, drawable_size.y);
 	static glm::mat4 to_clip = glm::mat4( //n.b. column major(!)
-		1 * 2.0f / float(drawable_size.x), 0.0f, 0.0f, 0.0f,
-		0.0f, 1 * 2.0f / float(drawable_size.y), 0.0f, 0.0f,
+		2.0 /drawable_size.x, 0.0f, 0.0f, 0.0f,
+		0.0f, 2.0 /drawable_size.y , 0.0f, 0.0f,
 		0.0f, 0.0f, 1.0f, 0.0f,
 		2.0f / float(drawable_size.x), 2.0f / float(drawable_size.y), 0.0f, 1.0f
 	);	
 	static DrawWords draw_words(to_clip);
 
-	int y_offset = 0;
+	int y_offset = 100;
 	for (auto const& item : items) {
-		bool is_selected = (&item == &items[0] + selected);
-		/*float aspect = float(drawable_size.x) / float(drawable_size.y);*/
-		glm::u8vec4 color = (is_selected ? glm::u8vec4(0xff, 0x00, 0xff, 0x00) : glm::u8vec4(0x00, 0x00, 0x00, 0x00));
-		draw_words.draw_text(item.name, y_offset, color);
-		y_offset -= 50;
+
+		// regular items
+		if (!item.type)
+		{
+			bool is_selected = (&item == &items[0] + selected);
+			/*float aspect = float(drawable_size.x) / float(drawable_size.y);*/
+			glm::u8vec4 color = (is_selected ? glm::u8vec4(0xff, 0x00, 0x00, 0x00) : glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+			draw_words.draw_text(item.name, -50, y_offset, color);
+			y_offset -= 50;
+		}
+		else if (item.type == 1)
+		{
+			// remaining items
+			std::string s = item.name + ": " + std::to_string(points);
+			draw_words.draw_text(s, -600, -300, glm::u8vec4(0xff, 0xff, 0xff, 0x00));
+		}
+
 	}
 	///////////////////////////////////////////////////////
 	// older code that draws menus with draw lines 
